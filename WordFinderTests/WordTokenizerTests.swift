@@ -36,7 +36,12 @@ import Testing
     #expect(words.map(\.term) == ["resilient", "urban"])
 }
 
-@Test func keepsCurlyApostropheLikeStraightOne() {
-    let words = WordTokenizer.tokenize("doesn't well-being")
-    #expect(words.map(\.term) == ["doesn't", "well-being"])
+/// Pins that a typographic apostrophe inside a word survives tokenization —
+/// Vision emits U+2019 for printed text. This does NOT distinguish whether
+/// U+2019 sits in `allowedInside`: `trimOuterPunctuation` only inspects the
+/// first and last character, so an interior apostrophe is untouched either way.
+@Test func keepsCurlyApostropheInsideWord() {
+    let curly = "\u{2019}"
+    let words = WordTokenizer.tokenize("doesn\(curly)t well-being")
+    #expect(words.map(\.term) == ["doesn\(curly)t", "well-being"])
 }
