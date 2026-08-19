@@ -362,10 +362,13 @@ import Testing
 }
 
 @Test func settlingWinsOverTimeoutAtTheSameInstant() {
-    let detector = StabilityDetector(stabilityWindow: 0.6, timeout: 10)
+    // 0.5, 9.5, 10.0 은 이진 부동소수점에서 정확히 표현된다. 0.6 / 9.4 를 쓰면
+    // 10.0 - 9.4 == 0.5999999999999996 이 되어, 검증하려는 동작과 무관한 이유로
+    // 실패한다.
+    let detector = StabilityDetector(stabilityWindow: 0.5, timeout: 10)
     detector.start(at: 0)
 
-    #expect(detector.ingest("resilient", at: 9.4) == .waiting)
+    #expect(detector.ingest("resilient", at: 9.5) == .waiting)
     #expect(detector.ingest("resilient", at: 10.0) == .settled("resilient"))
 }
 
@@ -377,7 +380,7 @@ import Testing
     detector.reset()
     detector.start(at: 100)
     #expect(detector.ingest("resilient", at: 100.5) == .waiting)   // 이전 진행 무효
-    #expect(detector.ingest("resilient", at: 101.1) == .settled("resilient"))
+    #expect(detector.ingest("resilient", at: 101.5) == .settled("resilient"))
 }
 ```
 
