@@ -173,9 +173,15 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
 }
 
 @Test @MainActor func tapCancelIsIgnoredWhenIdle() {
-    let (vm, recognizer, _) = makeSUT()
+    let (vm, recognizer, clock) = makeSUT()
+    vm.tapScan()
+    clock.now = 10.0
+    recognizer.emit(nil)
+    #expect(vm.state == .idle(message: ScanViewModel.timeoutMessage))
+
+    // 가드가 없으면 이 호출이 안내 문구를 지워버린다.
     vm.tapCancel()
-    #expect(vm.state == .idle(message: nil))
+    #expect(vm.state == .idle(message: ScanViewModel.timeoutMessage))
     #expect(recognizer.isScanning == false)
 }
 
@@ -212,4 +218,18 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
     recognizer.emit("?!")
     #expect(vm.state == .scanning(preview: "?!"))
     #expect(recognizer.isScanning == true)
+}
+
+@Test @MainActor func punctuationOnlyTextEventuallyTimesOut() {
+    let (vm, recognizer, clock) = makeSUT()
+    vm.tapScan()
+    clock.now = 0.0
+    recognizer.emit("?!")
+    clock.now = 5.0
+    recognizer.emit("?!")
+    #expect(vm.state == .scanning(preview: "?!"))
+    clock.now = 10.0
+    recognizer.emit("?!")
+    #expect(vm.state == .idle(message: ScanViewModel.timeoutMessage))
+    #expect(recognizer.isScanning == false)
 }

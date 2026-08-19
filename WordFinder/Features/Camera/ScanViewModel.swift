@@ -79,18 +79,17 @@ final class ScanViewModel {
         guard case .scanning = state else { return }
         lastText = text
 
-        switch detector.ingest(text, at: now()) {
+        // 구두점만 있는 등 쓸 수 있는 단어가 하나도 안 나오는 입력은 "아무것도 못 읽음"과
+        // 똑같이 취급한다. 그래야 확정 후보가 되지 않고 타임아웃도 계속 흐른다.
+        // 프리뷰에는 정규화 전 원문을 그대로 보여준다.
+        let usable = text.flatMap { WordTokenizer.tokenize($0).isEmpty ? nil : $0 }
+
+        switch detector.ingest(usable, at: now()) {
         case .waiting:
             state = .scanning(preview: text)
         case .settled(let confirmed):
-            let words = WordTokenizer.tokenize(confirmed)
-            // 구두점만 있는 경우처럼 토큰이 하나도 안 남으면 확정으로 치지 않는다.
-            guard !words.isEmpty else {
-                state = .scanning(preview: text)
-                return
-            }
             stop()
-            state = .settled(words)
+            state = .settled(WordTokenizer.tokenize(confirmed))
         case .timedOut:
             stop()
             state = .idle(message: Self.timeoutMessage)
