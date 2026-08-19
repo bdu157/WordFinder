@@ -1043,6 +1043,14 @@ git commit -m "feat: add VisionKit DataScanner implementation of TextRecognizer"
 - Consumes: `ScanViewModel`, `ScanState`, `DataScannerRecognizer`, `ScannerViewRepresentable`
 - Produces: 없음 (최종 소비자)
 
+> **이 태스크에서 정면으로 다뤄야 할 것 (Task 5 리뷰 지적):** `ScannerViewRepresentable`
+> 이 구체 타입 `DataScannerRecognizer` 에 묶여 있고 `regionOfInterest` 도 프로토콜이
+> 아니라 구체 클래스에 있다. 그래서 이 화면이 구체 타입에 바인딩되고, 나중에
+> `AVCaptureSession` 구현으로 갈아끼울 때 화면까지 손대야 한다 — 프로토콜을 둔 이유와
+> 반대다. 어떤 카메라 구현이든 자기 프리뷰 뷰를 가져오므로 이음매를 완전히 없앨 수는
+> 없다. 최소한 지킬 것: `ScanViewModel` 은 카메라 타입을 전혀 몰라야 하고, 교체 시
+> 고쳐야 할 지점이 이 파일 안 한 곳으로 국한돼야 한다.
+
 **`ScanViewModel.swift` 는 수정하지 않는다.** Task 4에서 `recognizer` 를 `TextRecognizer` 프로토콜 타입으로 private 하게 잡아둔 그대로 둔다. 화면이 프리뷰를 얹으려면 구체 타입이 필요한데, 그 인스턴스는 **`CameraView` 가 직접 소유**한다. 그래서 `ScanViewModel` 은 카메라 구현을 계속 모른 채로 남고, Task 4의 테스트 12개가 수정 없이 통과한다.
 
 - [ ] **Step 1: CameraView 교체**
