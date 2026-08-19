@@ -4,9 +4,14 @@ import Foundation
 /// (Week 0 PoC, see PLAN.md §2/§8) are wired up. Mirrors the mock copy used in
 /// the Claude Design mockups so the UI can be built and reviewed before the
 /// real pipeline exists.
-struct ScannedWord: Identifiable {
+struct ScannedWord: Identifiable, Equatable {
     let id = UUID()
     let term: String
+
+    /// `id` 는 인스턴스마다 다르므로 단어 자체로 비교한다.
+    static func == (lhs: ScannedWord, rhs: ScannedWord) -> Bool {
+        lhs.term == rhs.term
+    }
 }
 
 struct WordDetailPreview {
