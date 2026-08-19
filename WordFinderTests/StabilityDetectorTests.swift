@@ -74,10 +74,14 @@ import Testing
 }
 
 @Test func settlingWinsOverTimeoutAtTheSameInstant() {
-    let detector = StabilityDetector(stabilityWindow: 0.6, timeout: 10)
+    // 0.5, 9.5 and 10.0 are all exactly representable in binary floating point,
+    // so the settle check lands exactly on the window boundary instead of a hair
+    // under it. With 0.6 the arithmetic gives 0.5999999999999996 and this test
+    // would fail for reasons that have nothing to do with the behaviour it pins.
+    let detector = StabilityDetector(stabilityWindow: 0.5, timeout: 10)
     detector.start(at: 0)
 
-    #expect(detector.ingest("resilient", at: 9.4) == .waiting)
+    #expect(detector.ingest("resilient", at: 9.5) == .waiting)
     #expect(detector.ingest("resilient", at: 10.0) == .settled("resilient"))
 }
 
@@ -88,6 +92,7 @@ import Testing
 
     detector.reset()
     detector.start(at: 100)
-    #expect(detector.ingest("resilient", at: 100.5) == .waiting)   // 이전 진행 무효
-    #expect(detector.ingest("resilient", at: 101.1) == .settled("resilient"))
+    // 이전 진행이 무효라면 이 시점에는 아직 확정되지 않아야 한다.
+    #expect(detector.ingest("resilient", at: 100.5) == .waiting)
+    #expect(detector.ingest("resilient", at: 101.5) == .settled("resilient"))
 }
