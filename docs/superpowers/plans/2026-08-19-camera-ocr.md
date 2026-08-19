@@ -377,7 +377,7 @@ import Testing
     detector.reset()
     detector.start(at: 100)
     #expect(detector.ingest("resilient", at: 100.5) == .waiting)   // 이전 진행 무효
-    #expect(detector.ingest("resilient", at: 100.6) == .settled("resilient"))
+    #expect(detector.ingest("resilient", at: 101.1) == .settled("resilient"))
 }
 ```
 
