@@ -25,6 +25,10 @@ not in the client** — the iOS app is a thin client over a `DictEntry` contract
 # First time only
 brew install xcodegen
 
+# Required after cloning, BEFORE the first xcodegen run — project.yml references
+# this file via configFiles, and xcodegen hard-fails if it's missing.
+cp WordFinder/Config/Team.xcconfig.example WordFinder/Config/Team.xcconfig
+
 # After cloning, or whenever project.yml changes
 xcodegen generate
 
@@ -38,9 +42,15 @@ xcodebuild -project WordFinder.xcodeproj -scheme WordFinder \
   -destination 'id=<UDID>' -configuration Debug build
 ```
 
-Real-device builds need `WordFinder/Config/Team.xcconfig` (gitignored — copy it
-from `Team.xcconfig.example` and fill in your own Apple Developer Team ID).
-Simulator builds don't need it.
+`WordFinder/Config/Team.xcconfig` is gitignored and **must exist for any
+`xcodegen generate` to succeed**, simulator or device. Copy it from
+`Team.xcconfig.example` as shown above. Only real-device builds need a real value
+in it — for simulator work the `YOUR_TEAM_ID` placeholder is fine, since simulator
+builds are ad-hoc signed.
+
+**There is no test target.** `project.yml` declares one target (`WordFinder`,
+application), so there is nothing to run tests with yet. Adding tests means adding
+a test target to `project.yml` and regenerating — not creating one in Xcode.
 
 ## When you change project structure
 
@@ -56,7 +66,9 @@ If you change **targets, build settings, or Info.plist keys**, edit `project.yml
 
 - `WordFinder/Models/DictEntry.swift` is the **shared contract** with the server
   (Cloud Functions). If you change it, the server-side schema and OpenAPI spec
-  need to change with it, in the same PR/coordinated PRs.
+  need to change with it, in the same PR/coordinated PRs. Note the enum case
+  `DictSource.mwLearners` maps to the wire value `"mw-learners"` — the Swift case
+  name and the JSON string differ.
 - SwiftData models (`DictEntryRecord`, `HistoryRecord`) are the local cache —
   `entries`/`history` are separate so repeated lookups of the same word don't
   duplicate dictionary data.
@@ -64,6 +76,21 @@ If you change **targets, build settings, or Info.plist keys**, edit `project.yml
   no shutter), not a shutter-based capture flow. See PLAN.md §2 for why.
 - Theme (light/dark) is an explicit in-app choice via `@AppStorage`, not
   system-follow.
+
+## Design tokens
+
+Colors and fonts are defined once in `WordFinder/Design/` from the Claude Design
+system (see `design_prompt_for_claude_design.md`). Use `Color.wf*` and `Font.wf*`;
+don't introduce raw hex or ad-hoc `Font.system(...)` sizes for semantic UI.
+
+- The **Primary** role lives in `Assets.xcassets/AccentColor`, reachable as
+  `Color.accentColor` — it is deliberately *not* a `wf` token, so don't go looking
+  for `Color.wfPrimary`.
+- `Color.wf*` tokens are light/dark adaptive via `UITraitCollection`. The
+  non-adaptive `Color(hex:)` initializer is for decorative one-offs only
+  (e.g. the mock camera background).
+- Dictionary content — headwords, definitions, examples — uses serif (New York)
+  via `design: .serif`. UI chrome uses SF Pro.
 
 ## Current placeholders — don't be surprised by these
 
@@ -75,7 +102,15 @@ If you change **targets, build settings, or Info.plist keys**, edit `project.yml
 - **Server**: Cloud Functions (fallback chain, Firestore cache) don't exist in
   this repo yet. PLAN.md §4–§6 describes the intended design.
 - **Favorites**: dropped from the current 3-tab design (camera/history/settings).
-  If it comes back, it's a history-item feature, not a separate tab.
+  If it comes back, it's a history-item feature, not a separate tab. (PLAN.md §6
+  still declares a `FavoriteRecord` model — that's stale, the code intentionally
+  implements only `DictEntryRecord` and `HistoryRecord`.)
+
+## Licensing constraint
+
+dictionaryapi.dev is CC BY-SA 3.0 and the Merriam-Webster free key is
+non-commercial. The attribution string at the bottom of `SettingsView` is a
+license obligation, not decoration — don't remove it while tidying UI.
 
 ## Collaboration workflow
 
