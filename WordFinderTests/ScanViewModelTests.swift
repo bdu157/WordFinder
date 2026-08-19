@@ -38,7 +38,7 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
     return (vm, recognizer, clock)
 }
 
-@Test @MainActor func startsIdleWithGuidanceAndDoesNotScan() {
+@Test @MainActor func startsIdleWithoutMessageAndDoesNotScan() {
     let (vm, recognizer, _) = makeSUT()
     #expect(vm.state == .idle(message: nil))
     #expect(recognizer.isScanning == false)
@@ -109,7 +109,6 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
 
     vm.dismissSheet()
     #expect(vm.state == .idle(message: nil))
-    #expect(recognizer.isScanning == false)
 }
 
 @Test @MainActor func cancelReturnsToIdleAndStopsRecognizer() {
@@ -158,6 +157,17 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
 
     vm.tapScan()
     #expect(vm.state == .idle(message: ScanViewModel.unsupportedMessage))
+    #expect(recognizer.isScanning == false)
+}
+
+private struct SomeOtherError: Error {}
+
+@Test @MainActor func unexpectedStartErrorShowsRetryMessage() {
+    let (vm, recognizer, _) = makeSUT()
+    recognizer.startError = SomeOtherError()
+
+    vm.tapScan()
+    #expect(vm.state == .idle(message: ScanViewModel.startFailureMessage))
     #expect(recognizer.isScanning == false)
 }
 

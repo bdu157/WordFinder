@@ -19,6 +19,12 @@ enum StabilityOutcome: Equatable {
 final class StabilityDetector {
     private let stabilityWindow: TimeInterval
     private let timeout: TimeInterval
+    /// 확정 후보로 인정할 최소 길이.
+    ///
+    /// `ScanViewModel` 경로에서는 도달하지 않는다 — 거기서는 `WordTokenizer` 가 먼저
+    /// 걸러낸 문자열만 들어오기 때문이다. 이 상수는 이 타입의 유닛 테스트와, 토크나이저를
+    /// 거치지 않는 미래의 직접 호출자를 위해 남아 있다. 실기기 튜닝은
+    /// `WordTokenizer.minimumLength` 를 조정해야 한다.
     private let minimumLength: Int
 
     private var startedAt: TimeInterval?

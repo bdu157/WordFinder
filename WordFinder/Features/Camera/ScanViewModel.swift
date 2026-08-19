@@ -16,6 +16,7 @@ final class ScanViewModel {
     static let timeoutMessage = "Couldn't read that — try moving closer"
     static let permissionMessage = "Camera access is off. Turn it on in Settings to scan."
     static let unsupportedMessage = "This device can't scan text."
+    static let startFailureMessage = "Couldn't start the camera. Try again."
 
     private(set) var state: ScanState = .idle(message: nil)
 
@@ -50,10 +51,14 @@ final class ScanViewModel {
             recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.permissionMessage)
-        } catch {
+        } catch RecognizerError.unsupportedDevice {
             recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.unsupportedMessage)
+        } catch {
+            recognizer.stopScanning()
+            detector.reset()
+            state = .idle(message: Self.startFailureMessage)
         }
     }
 

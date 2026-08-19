@@ -53,6 +53,9 @@ import Testing
     #expect(detector.ingest("resilient", at: 0.0) == .waiting)
     #expect(detector.ingest(nil, at: 0.3) == .waiting)          // 박스가 비었음
     #expect(detector.ingest("resilient", at: 0.5) == .waiting)  // 처음부터 다시
+    // 리셋이 됐다면 후보는 0.5 부터 다시 세므로 0.9 에는 아직 0.4 초뿐이다.
+    // 리셋이 안 됐다면 0.0 부터 0.9 초가 지나 여기서 확정돼 버린다.
+    #expect(detector.ingest("resilient", at: 0.9) == .waiting)
     #expect(detector.ingest("resilient", at: 1.1) == .settled("resilient"))
 }
 
