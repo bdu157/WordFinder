@@ -776,6 +776,8 @@ final class ScanViewModel {
     private let recognizer: TextRecognizer
     private let detector: StabilityDetector
     private let now: () -> TimeInterval
+    /// 마지막으로 인식기가 준 값. `tick()` 이 타임아웃을 굴릴 때 다시 먹인다.
+    private var lastText: String?
 
     init(
         recognizer: TextRecognizer,
@@ -793,13 +795,16 @@ final class ScanViewModel {
     func tapScan() {
         guard case .idle = state else { return }
         detector.start(at: now())
+        lastText = nil
         do {
             try recognizer.startScanning()
             state = .scanning(preview: nil)
         } catch RecognizerError.permissionDenied {
+            recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.permissionMessage)
         } catch {
+            recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.unsupportedMessage)
         }
@@ -818,8 +823,14 @@ final class ScanViewModel {
 
     private func handle(_ text: String?) {
         guard case .scanning = state else { return }
+        lastText = text
 
-        switch detector.ingest(text, at: now()) {
+        // 구두점만 있는 등 쓸 수 있는 단어가 하나도 안 나오는 입력은 "아무것도 못 읽음"과
+        // 똑같이 취급한다. 그래야 확정 후보가 되지 않고 타임아웃도 계속 흐른다.
+        // 프리뷰에는 정규화 전 원문을 그대로 보여준다.
+        let usable = text.flatMap { WordTokenizer.tokenize($0).isEmpty ? nil : $0 }
+
+        switch detector.ingest(usable, at: now()) {
         case .waiting:
             state = .scanning(preview: text)
         case .settled(let confirmed):
@@ -829,6 +840,13 @@ final class ScanViewModel {
             stop()
             state = .idle(message: Self.timeoutMessage)
         }
+    }
+
+    /// 인식기가 콜백을 주지 않아도 타임아웃이 동작하도록 화면이 주기적으로 호출한다.
+    /// `DataScannerViewController` 의 델리게이트는 프레임 단위가 아니라 이벤트
+    /// 단위여서, 박스 안에 아무것도 없으면 콜백이 아예 오지 않는다.
+    func tick() {
+        handle(lastText)
     }
 
     private func stop() {
@@ -1101,6 +1119,17 @@ struct CameraView: View {
             .onChange(of: model.state) { _, newState in
                 if case .settled = newState { showsSheet = true }
             }
+            .task(id: isScanning) {
+                // **필수** — `ScanViewModel.tick()` 을 굴리지 않으면 타임아웃이 죽는다.
+                // `DataScannerViewController` 의 델리게이트는 이벤트 단위라, 박스 안에
+                // 아무것도 없으면 콜백이 아예 오지 않아 `ingest` 가 호출되지 않는다.
+                // 빈 벽을 비추는 경우가 정확히 타임아웃이 존재하는 이유다.
+                guard isScanning else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    model.tick()
+                }
+            }
         }
     }
 
@@ -1118,6 +1147,11 @@ struct CameraView: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+    }
+
+    private var isScanning: Bool {
+        if case .scanning = model.state { return true }
+        return false
     }
 
     private var bracketColor: Color {
