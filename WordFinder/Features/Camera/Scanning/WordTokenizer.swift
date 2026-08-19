@@ -21,7 +21,8 @@ enum WordTokenizer {
     /// 단어 바깥쪽의 구두점만 제거한다. 안쪽 하이픈·아포스트로피는 단어의
     /// 일부이므로 남긴다 (`well-being`, `doesn't`).
     private static func trimOuterPunctuation(_ token: String) -> String {
-        let allowedInside = CharacterSet(charactersIn: "-''")
+        let allowedInside = CharacterSet(charactersIn: "-'’")
+
         let strippable = CharacterSet.punctuationCharacters
             .union(.symbols)
             .subtracting(allowedInside)

@@ -35,3 +35,8 @@ import Testing
     let words = WordTokenizer.tokenize("resilient --- urban")
     #expect(words.map(\.term) == ["resilient", "urban"])
 }
+
+@Test func keepsCurlyApostropheLikeStraightOne() {
+    let words = WordTokenizer.tokenize("doesn't well-being")
+    #expect(words.map(\.term) == ["doesn't", "well-being"])
+}
