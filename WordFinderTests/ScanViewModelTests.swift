@@ -11,8 +11,8 @@ final class FakeRecognizer: TextRecognizer {
     static var isSupported: Bool { true }
 
     func startScanning() throws {
-        if let startError { throw startError }
         isScanning = true
+        if let startError { throw startError }
     }
     func stopScanning() { isScanning = false }
 
@@ -149,6 +149,7 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
 
     vm.tapScan()
     #expect(vm.state == .idle(message: ScanViewModel.permissionMessage))
+    #expect(recognizer.isScanning == false)
 }
 
 @Test @MainActor func unsupportedDeviceShowsItsOwnMessage() {
@@ -157,4 +158,58 @@ private func makeSUT() -> (ScanViewModel, FakeRecognizer, FakeClock) {
 
     vm.tapScan()
     #expect(vm.state == .idle(message: ScanViewModel.unsupportedMessage))
+    #expect(recognizer.isScanning == false)
+}
+
+@Test @MainActor func tapScanIsIgnoredWhileScanning() {
+    let (vm, recognizer, clock) = makeSUT()
+    vm.tapScan()
+    clock.now = 0.3
+    recognizer.emit("resilient")
+    vm.tapScan()                     // 무시되어야 한다 — 무시되지 않으면 창이 리셋된다
+    clock.now = 0.9
+    recognizer.emit("resilient")
+    #expect(vm.state == .settled([ScannedWord(term: "resilient")]))
+}
+
+@Test @MainActor func tapCancelIsIgnoredWhenIdle() {
+    let (vm, recognizer, _) = makeSUT()
+    vm.tapCancel()
+    #expect(vm.state == .idle(message: nil))
+    #expect(recognizer.isScanning == false)
+}
+
+@Test @MainActor func dismissSheetIsIgnoredWhileScanning() {
+    let (vm, _, _) = makeSUT()
+    vm.tapScan()
+    vm.dismissSheet()                // 무시되어야 한다
+    #expect(vm.state == .scanning(preview: nil))
+}
+
+@Test @MainActor func tickDrivesTimeoutWhenRecognizerNeverCallsBack() {
+    let (vm, recognizer, clock) = makeSUT()
+    vm.tapScan()
+    // 인식기가 콜백을 단 한 번도 주지 않는다 — 빈 벽을 비춘 경우
+    clock.now = 10.0
+    vm.tick()
+    #expect(vm.state == .idle(message: ScanViewModel.timeoutMessage))
+    #expect(recognizer.isScanning == false)
+}
+
+@Test @MainActor func tickIsIgnoredWhenNotScanning() {
+    let (vm, _, clock) = makeSUT()
+    clock.now = 100.0
+    vm.tick()
+    #expect(vm.state == .idle(message: nil))
+}
+
+@Test @MainActor func punctuationOnlyTextDoesNotSettle() {
+    let (vm, recognizer, clock) = makeSUT()
+    vm.tapScan()
+    clock.now = 0.0
+    recognizer.emit("?!")
+    clock.now = 0.6
+    recognizer.emit("?!")
+    #expect(vm.state == .scanning(preview: "?!"))
+    #expect(recognizer.isScanning == true)
 }

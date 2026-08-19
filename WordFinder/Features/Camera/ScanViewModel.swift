@@ -23,6 +23,9 @@ final class ScanViewModel {
     private let detector: StabilityDetector
     private let now: () -> TimeInterval
 
+    /// 마지막으로 인식기가 준 값. `tick()` 이 타임아웃을 굴릴 때 다시 먹인다.
+    private var lastText: String?
+
     init(
         recognizer: TextRecognizer,
         detector: StabilityDetector = StabilityDetector(),
@@ -39,13 +42,16 @@ final class ScanViewModel {
     func tapScan() {
         guard case .idle = state else { return }
         detector.start(at: now())
+        lastText = nil
         do {
             try recognizer.startScanning()
             state = .scanning(preview: nil)
         } catch RecognizerError.permissionDenied {
+            recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.permissionMessage)
         } catch {
+            recognizer.stopScanning()
             detector.reset()
             state = .idle(message: Self.unsupportedMessage)
         }
@@ -62,15 +68,29 @@ final class ScanViewModel {
         state = .idle(message: nil)
     }
 
+    /// 인식기가 콜백을 주지 않아도 타임아웃이 동작하도록 화면이 주기적으로 호출한다.
+    /// `DataScannerViewController` 의 델리게이트는 프레임 단위가 아니라 이벤트
+    /// 단위여서, 박스 안에 아무것도 없으면 콜백이 아예 오지 않는다.
+    func tick() {
+        handle(lastText)
+    }
+
     private func handle(_ text: String?) {
         guard case .scanning = state else { return }
+        lastText = text
 
         switch detector.ingest(text, at: now()) {
         case .waiting:
             state = .scanning(preview: text)
         case .settled(let confirmed):
+            let words = WordTokenizer.tokenize(confirmed)
+            // 구두점만 있는 경우처럼 토큰이 하나도 안 남으면 확정으로 치지 않는다.
+            guard !words.isEmpty else {
+                state = .scanning(preview: text)
+                return
+            }
             stop()
-            state = .settled(WordTokenizer.tokenize(confirmed))
+            state = .settled(words)
         case .timedOut:
             stop()
             state = .idle(message: Self.timeoutMessage)
