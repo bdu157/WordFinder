@@ -9,6 +9,7 @@ struct ScannerViewRepresentable: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         recognizer.regionOfInterest = regionOfInterest
+        recognizer.controller.regionOfInterest = regionOfInterest
         return recognizer.controller
     }
 

@@ -42,9 +42,13 @@ final class DataScannerRecognizer: NSObject, TextRecognizer {
             try controller.startScanning()
         } catch DataScannerViewController.ScanningUnavailable.unsupported {
             throw RecognizerError.unsupportedDevice
-        } catch {
-            // .cameraRestricted 및 권한 거부·화면 잠김 등이 여기로 온다.
+        } catch DataScannerViewController.ScanningUnavailable.cameraRestricted {
+            // 권한 거부와 Screen Time 제한이 모두 여기로 온다. 둘 다 설정에서 푼다.
             throw RecognizerError.permissionDenied
+        } catch {
+            // 그 밖의 실패는 그대로 흘려보낸다. `ScanViewModel` 의 catch-all 이
+            // "다시 시도" 안내를 띄운다 — 하드웨어 미지원으로 오인하지 않게.
+            throw error
         }
     }
 
@@ -52,14 +56,28 @@ final class DataScannerRecognizer: NSObject, TextRecognizer {
         controller.stopScanning()
     }
 
-    /// 박스 안 항목들을 화면 왼쪽→오른쪽 순으로 이어붙인다.
+    /// 박스 안 항목들을 읽는 순서(위 → 아래, 왼 → 오른)로 이어붙인다.
+    ///
+    /// 세로 위치를 가이드 박스 높이로 나눠 "줄"로 묶은 뒤 그 안에서 가로 위치로
+    /// 정렬한다. 허용 오차로 두 항목을 직접 비교하면 `a~b`, `b~c` 인데 `a≁c` 인
+    /// 경우가 생겨 정렬 기준이 깨지므로, 버킷으로 나누는 방식을 쓴다.
+    /// 완전히 같은 위치면 transcript 로 갈라 프레임마다 순서가 흔들리지 않게 한다.
     private func joined(_ items: [RecognizedItem]) -> String? {
+        /// 같은 줄로 묶는 단위. 가이드 박스 높이와 같다.
+        let lineHeight: CGFloat = 38
+
         let texts = items
-            .compactMap { item -> (CGFloat, String)? in
+            .compactMap { item -> (CGPoint, String)? in
                 guard case .text(let text) = item else { return nil }
-                return (text.bounds.topLeft.x, text.transcript)
+                return (text.bounds.topLeft, text.transcript)
             }
-            .sorted { $0.0 < $1.0 }
+            .sorted { lhs, rhs in
+                let lhsLine = (lhs.0.y / lineHeight).rounded(.down)
+                let rhsLine = (rhs.0.y / lineHeight).rounded(.down)
+                if lhsLine != rhsLine { return lhsLine < rhsLine }
+                if lhs.0.x != rhs.0.x { return lhs.0.x < rhs.0.x }
+                return lhs.1 < rhs.1
+            }
             .map(\.1)
 
         return texts.isEmpty ? nil : texts.joined(separator: " ")
