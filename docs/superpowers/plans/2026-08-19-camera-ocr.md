@@ -527,6 +527,7 @@ git commit -m "feat: add StabilityDetector with injected clock"
 `WordFinderTests/ScanViewModelTests.swift`:
 
 ```swift
+import Foundation
 import Testing
 @testable import WordFinder
 
