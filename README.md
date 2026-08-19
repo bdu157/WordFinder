@@ -13,17 +13,18 @@
 
 ```bash
 brew install xcodegen   # 처음 한 번만
+cp WordFinder/Config/Team.xcconfig.example WordFinder/Config/Team.xcconfig
 xcodegen generate       # project.yml → WordFinder.xcodeproj 생성
 open WordFinder.xcodeproj
 ```
 
-시뮬레이터 실행은 이걸로 끝입니다.
+시뮬레이터 실행은 이걸로 끝입니다. Team ID는 아직 비워둬도(`YOUR_TEAM_ID` 그대로) 됩니다.
 
-**실기기**에서 돌리려면 서명 팀 설정이 필요합니다:
+> `cp` 단계를 건너뛰면 `xcodegen generate`가 `Invalid config file "WordFinder/Config/Team.xcconfig"` 오류로 **실패합니다.** `project.yml`이 이 파일을 `configFiles`로 참조하는데 `Team.xcconfig` 자체는 gitignore되어 있어서, 클론 직후에는 존재하지 않기 때문입니다. 시뮬레이터만 쓰더라도 파일은 있어야 합니다.
+
+**실기기**에서 돌리려면 `Team.xcconfig`를 열어 `DEVELOPMENT_TEAM`을 본인 Apple Developer Team ID로 바꾸고 다시 생성하세요:
 
 ```bash
-cp WordFinder/Config/Team.xcconfig.example WordFinder/Config/Team.xcconfig
-# Team.xcconfig을 열어 DEVELOPMENT_TEAM을 본인 Apple Developer Team ID로 수정
 xcodegen generate
 ```
 
