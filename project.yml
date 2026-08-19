@@ -1,0 +1,42 @@
+name: WordFinder
+options:
+  bundleIdPrefix: com.wordfinder
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  WordFinder:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: WordFinder
+    info:
+      path: WordFinder/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: WordFinder
+        NSCameraUsageDescription: "WordFinder uses the camera to scan text so it can look up word definitions instantly."
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wordfinder.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SWIFT_EMIT_LOC_STRINGS: YES
+        ENABLE_PREVIEWS: YES
+schemes:
+  WordFinder:
+    build:
+      targets:
+        WordFinder: all
+    run:
+      config: Debug
+    archive:
+      config: Release
