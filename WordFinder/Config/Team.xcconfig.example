@@ -1,0 +1,10 @@
+// Copy this file to Team.xcconfig (same folder) and fill in your own Apple
+// Developer Team ID. Team.xcconfig is gitignored — each developer keeps their
+// own, so signing settings never get committed or fought over in git.
+//
+// Find your Team ID in Xcode: Settings → Accounts → (your Apple ID) → Team,
+// or at https://developer.apple.com/account (Membership details).
+//
+// Only needed for running on a real device. Simulator builds work without it.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID

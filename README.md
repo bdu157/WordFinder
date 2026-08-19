@@ -9,18 +9,39 @@
 
 ## 처음 열 때
 
-`WordFinder.xcodeproj`를 그대로 더블클릭해서 열면 바로 빌드됩니다. 별도 설치 없이 시뮬레이터 실행 가능.
-
-실기기에서 돌리려면 Xcode에서 **Signing & Capabilities → Team**을 본인 Apple ID로 바꿔야 합니다 (지금은 시뮬레이터 전용 서명 상태).
-
-## 프로젝트 구조를 바꿀 때
-
-이 프로젝트는 `.xcodeproj`를 직접 만지지 않고 `project.yml`(XcodeGen 스펙)에서 생성합니다. 새 파일을 Xcode 안에서 추가/삭제하는 정도는 그냥 하시면 되고, 타겟 설정·빌드 세팅·Info.plist 키처럼 구조적인 걸 바꿨다면:
+**`WordFinder.xcodeproj`는 git에 커밋되지 않습니다** — `project.yml`(XcodeGen 스펙)에서 생성되는 결과물입니다. 클론 후:
 
 ```bash
 brew install xcodegen   # 처음 한 번만
+xcodegen generate       # project.yml → WordFinder.xcodeproj 생성
+open WordFinder.xcodeproj
+```
+
+시뮬레이터 실행은 이걸로 끝입니다.
+
+**실기기**에서 돌리려면 서명 팀 설정이 필요합니다:
+
+```bash
+cp WordFinder/Config/Team.xcconfig.example WordFinder/Config/Team.xcconfig
+# Team.xcconfig을 열어 DEVELOPMENT_TEAM을 본인 Apple Developer Team ID로 수정
+xcodegen generate
+```
+
+`Team.xcconfig`는 gitignore되어 있어 각자 자기 Team ID를 넣어도 서로 덮어쓰지 않습니다.
+
+## 프로젝트 구조를 바꿀 때
+
+새 파일을 Xcode 안에서 추가/삭제하는 정도는 그냥 하시면 다음 `xcodegen generate` 때 반영됩니다. 타겟 설정·빌드 세팅·Info.plist 키처럼 구조적인 걸 바꿨다면 `project.yml`을 고치고:
+
+```bash
 xcodegen generate       # project.yml → WordFinder.xcodeproj 재생성
 ```
+
+그 후 커밋 전에 `xcodebuild`로 빌드가 되는지 한 번 확인해주세요 (`.xcodeproj`는 커밋 대상이 아니지만, 그게 정상적으로 생성/빌드되는지는 PR 전에 검증해야 합니다).
+
+## Claude Code로 작업할 때
+
+두 사람 다 Claude Code를 쓴다면 [CLAUDE.md](CLAUDE.md)를 먼저 읽게 하세요 — 빌드 명령, XcodeGen 워크플로, 아키텍처 전제, 현재 placeholder 목록이 정리되어 있습니다.
 
 ## 폴더 구조
 
