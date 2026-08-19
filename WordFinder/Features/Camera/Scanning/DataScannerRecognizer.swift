@@ -58,13 +58,18 @@ final class DataScannerRecognizer: NSObject, TextRecognizer {
 
     /// 박스 안 항목들을 읽는 순서(위 → 아래, 왼 → 오른)로 이어붙인다.
     ///
-    /// 세로 위치를 가이드 박스 높이로 나눠 "줄"로 묶은 뒤 그 안에서 가로 위치로
-    /// 정렬한다. 허용 오차로 두 항목을 직접 비교하면 `a~b`, `b~c` 인데 `a≁c` 인
-    /// 경우가 생겨 정렬 기준이 깨지므로, 버킷으로 나누는 방식을 쓴다.
-    /// 완전히 같은 위치면 transcript 로 갈라 프레임마다 순서가 흔들리지 않게 한다.
+    /// 세로 위치를 "줄"로 묶은 뒤 그 안에서 가로 위치로 정렬한다. 허용 오차로 두 항목을
+    /// 직접 비교하면 `a~b`, `b~c` 인데 `a≁c` 인 경우가 생겨 정렬 기준이 깨지므로 버킷을
+    /// 쓴다. 완전히 같은 위치면 transcript 로 갈라 프레임마다 순서가 흔들리지 않게 한다.
+    ///
+    /// 버킷의 기준점과 크기는 **가이드 박스**에서 가져온다. 뷰 좌표계의 절대 y 를 쓰면
+    /// 화면 높이에 따라 버킷 경계가 박스 한가운데에 떨어져, 같은 줄에 있는 두 단어가
+    /// 위아래로 갈리고 y 흔들림에 따라 순서가 프레임마다 뒤집힌다. 박스를 기준으로 삼으면
+    /// 한 줄짜리 박스의 내용은 전부 같은 버킷에 들어가 가로 순서만 남는다.
     private func joined(_ items: [RecognizedItem]) -> String? {
-        /// 같은 줄로 묶는 단위. 가이드 박스 높이와 같다.
-        let lineHeight: CGFloat = 38
+        let box = regionOfInterest
+        let originY = box?.minY ?? 0
+        let lineHeight = box.map { max($0.height, 1) } ?? 38
 
         let texts = items
             .compactMap { item -> (CGPoint, String)? in
@@ -72,8 +77,8 @@ final class DataScannerRecognizer: NSObject, TextRecognizer {
                 return (text.bounds.topLeft, text.transcript)
             }
             .sorted { lhs, rhs in
-                let lhsLine = (lhs.0.y / lineHeight).rounded(.down)
-                let rhsLine = (rhs.0.y / lineHeight).rounded(.down)
+                let lhsLine = ((lhs.0.y - originY) / lineHeight).rounded(.down)
+                let rhsLine = ((rhs.0.y - originY) / lineHeight).rounded(.down)
                 if lhsLine != rhsLine { return lhsLine < rhsLine }
                 if lhs.0.x != rhs.0.x { return lhs.0.x < rhs.0.x }
                 return lhs.1 < rhs.1
