@@ -168,16 +168,59 @@ license obligation, not decoration — don't remove it while tidying UI.
 
 ## Collaboration workflow
 
-- Don't push directly to `main` — short-lived feature branches, PR, squash merge.
-  Branch prefixes: `feat/…`, `fix/…`, `chore/…`.
+Two people work this repo. `main` is the shared baseline nobody commits to
+directly; all work happens on short-lived branches that land through a PR.
+
+### Branch lifecycle
+
+```bash
+# Start work — always re-sync main first. Branching off a stale main is where
+# conflicts come from.
+git switch main && git pull
+git switch -c feat/your-thing
+
+# ... work, commit ...
+
+git push -u origin feat/your-thing
+gh pr create --base main
+```
+
+If `main` moves while you are working (the other person merged first), catch up
+before asking for review:
+
+```bash
+git fetch origin && git rebase origin/main
+```
+
+After the PR is merged, delete the branch on both sides:
+
+```bash
+git switch main && git pull
+git branch -D feat/your-thing          # -d refuses; see below
+git push origin --delete feat/your-thing
+```
+
+**`git branch -d` will refuse after a squash merge.** Squashing rewrites the
+commits, so git sees no ancestry even though the content is identical and cannot
+tell the branch was merged. `-D` is correct here, not dangerous. The same reason
+makes `git rev-list --left-right main...branch` show the branch as "ahead" after
+it has landed — compare with `git diff main branch` instead, which will be empty.
+
+### Rules
+
+- Branch prefixes: `feat/…`, `fix/…`, `chore/…`. **Squash merge only** — the
+  repo's history is one commit per landed change.
 - Review before opening a PR. Keep PRs small — an agent that can produce hundreds
   of lines in one shot needs a human deliberately splitting the work, or review
   becomes the bottleneck.
 - PRs touching shared surfaces (`WordFinder/Models/`, `project.yml`,
   `WordFinder/Design/`, or server code once it exists) need review before
   merge. Changes scoped entirely inside your own feature area can self-merge.
-- Squash merge leaves the branch looking unmerged to git, since the commit SHAs
-  differ. `git branch -d` will refuse; use `-D`.
+- **Split work so you don't edit the same files.** This matters more than any
+  rule above — the cheapest merge conflict is the one that never happens. The
+  natural seam here is the one PLAN.md §4 already draws: iOS client on one side,
+  Cloud Functions on the other, meeting at the `DictEntry` contract. Agree who
+  owns which before starting parallel work.
 - Claude Code: `.claude/settings.json` is shared and tracked;
   `.claude/settings.local.json` is per-developer and gitignored. Don't put shared
   config in the local file.
