@@ -77,3 +77,18 @@ private func fixture(_ name: String) throws -> Data {
         try DictionaryAPIMapper.map(Data("[]".utf8), fetchedAt: 0)
     }
 }
+
+/// 합성 데이터 — 실제 픽스처의 뜻 단위 동의어는 전부 비어 있어서, 이 경로가 값을 실제로
+/// 옮기는지 검증할 수 없었다. 중복과 빈 문자열이 제거되는지도 함께 고정한다.
+@Test func keepsDefinitionLevelSynonymsDeduplicated() throws {
+    let json = """
+    [{"word":"quick","phonetics":[],"meanings":[
+      {"partOfSpeech":"adjective","definitions":[
+        {"definition":"moving fast","synonyms":["fast","rapid","fast",""]}
+      ]}
+    ]}]
+    """
+    let entry = try DictionaryAPIMapper.map(Data(json.utf8), fetchedAt: 0)
+    #expect(entry.meanings[0].definitions[0].synonyms == ["fast", "rapid"])
+    #expect(entry.meanings[0].synonyms == nil)
+}
