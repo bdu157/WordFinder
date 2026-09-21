@@ -17,7 +17,7 @@
 - **`.xcodeproj`는 커밋하지 않는다** (gitignore 대상)
 - UI 문구는 **전부 영어**. 앱 전체가 영어다 (`Words found`, `History`, `Settings`)
 - 색은 `Color.wf*` 토큰, 폰트는 `Font.wf*`만 사용. 원시 hex·임의 `Font.system` 금지. Primary 역할은 `Color.accentColor` (`AccentColor` 에셋)
-- 튜닝 상수 3개는 이름 있는 상수로 분리: 안정 판정 **0.6초**, 타임아웃 **10초**, 최소 길이 **2글자**
+- 튜닝 상수 3개는 이름 있는 상수로 분리: 안정 판정 **0.6초**, 타임아웃 **7초** (Task 7에서 10초 → 7초로 튜닝), 최소 길이 **2글자**
 - 표제어 추정(`running` → `run`)은 **클라이언트에 넣지 않는다.** 서버(PLAN.md F4) 몫
 - 빌드 검증 명령:
   ```bash
