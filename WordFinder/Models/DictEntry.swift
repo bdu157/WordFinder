@@ -14,6 +14,9 @@ struct DictEntry: Codable, Equatable {
     let fetchedAt: Int
 
     struct Meaning: Codable, Equatable {
+        /// `meanings` 안에서 **한 번씩만** 나온다 — 같은 품사는 하나의 Meaning 으로 합쳐서 보낸다.
+        /// 화면(`WordDetailSheet`)이 이 값을 식별자로 쓰므로, 중복되면 블록이 잘못 그려지고
+        /// "Show all" 이 두 블록을 함께 펼친다. dictionaryapi.dev 변환은 `DictionaryAPIMapper` 가 보장한다.
         let partOfSpeech: String
         let definitions: [Definition]
         /// 품사 단위 동의어. dictionaryapi.dev 는 동의어를 대부분 뜻이 아니라 여기에 둔다.

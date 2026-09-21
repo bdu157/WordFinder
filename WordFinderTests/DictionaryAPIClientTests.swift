@@ -40,3 +40,13 @@ func interpretsServerErrorsAsUnavailable(status: Int) {
         try DictionaryAPIClient.interpret(status: 200, data: Data("[]".utf8), fetchedAt: 0)
     }
 }
+
+/// 3초 제한은 요청 전체 시간이어야 한다. timeoutIntervalForRequest 는 "데이터가 안 오는 공백"
+/// 기준이라 조금씩 흘려보내는 서버에서는 3초를 넘길 수 있고, 실제로 상한을 거는 것은
+/// timeoutIntervalForResource 다. 둘 중 하나라도 지우면 이 테스트가 실패해야 한다.
+@Test func sessionCapsTheWholeRequestAtTheBudget() {
+    let configuration = DictionaryAPIClient.makeSession().configuration
+    #expect(DictionaryAPIClient.timeout == 3)
+    #expect(configuration.timeoutIntervalForRequest == DictionaryAPIClient.timeout)
+    #expect(configuration.timeoutIntervalForResource == DictionaryAPIClient.timeout)
+}
