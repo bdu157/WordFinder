@@ -1,40 +1,31 @@
 import SwiftUI
 
-/// Start screen of the app — a continuous live-scan viewfinder, not a shutter-based
-/// camera. Everything outside a fixed guide box is dimmed/blurred; text that sits in
-/// the box is recognized automatically. See design_prompt's Claude Design project,
-/// section "2a" (3탭 구조) for the source mockups this view matches.
-///
-/// The capture session itself is a placeholder — that's the Week 0 PoC
-/// (AVFoundation + Vision framework vs. VisionKit DataScannerViewController,
-/// see PLAN.md §2, §8). Tap anywhere to simulate a successful scan.
+/// 앱의 시작 화면. 셔터가 아니라 연속 라이브 스캔이며, 가이드 박스 밖은 블러 처리된다.
+/// Scan 버튼이 인식의 시작을 통제하고, 박스 안 텍스트가 안정되면 자동으로 확정된다.
+/// 설계 근거는 `docs/superpowers/specs/2026-08-19-camera-ocr-design.md`.
 struct CameraView: View {
-    @State private var scanState: ScanState = .idle
-    @State private var sheetStage: SheetStage?
+    /// 프리뷰를 얹으려면 구체 타입이 필요하므로 화면이 소유한다.
+    /// `ScanViewModel` 은 프로토콜 너머로만 이걸 본다.
+    ///
+    /// **카메라 구현 교체 지점.** `AVCaptureSession` + Vision 구현으로 바꿀 때는 이 타입,
+    /// 아래 `init()` 의 생성, `body` 의 프리뷰 뷰 — 이 파일의 세 곳만 고친다.
+    @State private var recognizer: DataScannerRecognizer
+    @State private var model: ScanViewModel
+    @State private var showsSheet = false
+    @State private var detailWord: ScannedWord?
+    @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        let recognizer = DataScannerRecognizer()
+        _recognizer = State(initialValue: recognizer)
+        _model = State(initialValue: ScanViewModel(recognizer: recognizer))
+    }
 
     private let guideBoxHeight: CGFloat = 38
     private let guideBoxCornerRadius: CGFloat = 4
-    /// Vertical center of the guide box as a fraction of screen height (matches the
-    /// design mockups: box top 190pt / frame height 874pt ≈ center at 0.239). Kept off
-    /// dead-center so the sheet's `.medium` detent doesn't cover it when it rises.
+    /// 가이드 박스의 세로 중심 (화면 높이 비율). 목업 기준이며, 시트가 `.medium`
+    /// 으로 올라와도 가리지 않도록 정중앙을 피해 두었다.
     private let guideBoxCenterY: CGFloat = 0.239
-
-    enum ScanState {
-        case idle
-        case recognized
-    }
-
-    enum SheetStage: Identifiable {
-        case wordList
-        case detail(ScannedWord)
-
-        var id: String {
-            switch self {
-            case .wordList: return "wordList"
-            case .detail(let word): return "detail-\(word.id)"
-            }
-        }
-    }
 
     var body: some View {
         GeometryReader { geo in
@@ -47,8 +38,11 @@ struct CameraView: View {
             )
 
             ZStack {
-                scannedBackground
-                    .ignoresSafeArea()
+                ScannerViewRepresentable(
+                    recognizer: recognizer,
+                    regionOfInterest: guideRect
+                )
+                .ignoresSafeArea()
 
                 GuideMaskShape(holeRect: guideRect, cornerRadius: guideBoxCornerRadius)
                     .fill(.ultraThinMaterial, style: FillStyle(eoFill: true))
@@ -66,46 +60,88 @@ struct CameraView: View {
                 VStack {
                     topBar
                     Spacer()
+                    bottomBar
                 }
                 .padding(.top, 8)
             }
-            .contentShape(Rectangle())
-            .onTapGesture { simulateRecognition() }
-            .sheet(item: $sheetStage, onDismiss: { scanState = .idle }) { stage in
-                switch stage {
-                case .wordList:
-                    WordListSheet(words: CameraMock.recognizedWords) { word in
-                        sheetStage = .detail(word)
-                    }
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-                case .detail:
-                    WordDetailSheet(detail: CameraMock.detail)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showsSheet, onDismiss: { model.dismissSheet() }) {
+                sheetContent
+            }
+            .onChange(of: model.state) { _, newState in
+                if case .settled = newState { showsSheet = true }
+            }
+            .task(id: isScanning) {
+                // **필수** — `ScanViewModel.tick()` 을 굴리지 않으면 타임아웃이 죽는다.
+                // `DataScannerViewController` 의 델리게이트는 이벤트 단위라, 박스 안에
+                // 아무것도 없으면 콜백이 아예 오지 않아 `ingest` 가 호출되지 않는다.
+                // 빈 벽을 비추는 경우가 정확히 타임아웃이 존재하는 이유다.
+                guard isScanning else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    model.tick()
                 }
+            }
+            // 화면을 벗어나거나(다른 탭) 앱이 백그라운드로 가면 스캔을 멈춘다. 안 그러면
+            // 히스토리 탭을 보는 동안에도 카메라가 켜져 있다. `tapCancel()` 은 스캔 중이
+            // 아닐 때는 아무것도 하지 않으므로 어느 상태에서 불러도 안전하다.
+            // `.inactive` (제어 센터를 내리는 등 일시적 상태)에서는 멈추지 않는다.
+            .onDisappear { model.tapCancel() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { model.tapCancel() }
             }
         }
     }
 
+    @ViewBuilder
+    private var sheetContent: some View {
+        if let detailWord {
+            WordDetailSheet(detail: CameraMock.detail)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .onDisappear { self.detailWord = nil }
+        } else if case .settled(let words) = model.state {
+            WordListSheet(words: words) { word in
+                detailWord = word
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var isScanning: Bool {
+        if case .scanning = model.state { return true }
+        return false
+    }
+
     private var bracketColor: Color {
-        scanState == .idle ? .white.opacity(0.9) : Color.wfAccent
+        if case .settled = model.state { return Color.wfAccent }
+        return .white.opacity(0.9)
     }
 
     @ViewBuilder
     private var captionView: some View {
-        switch scanState {
-        case .idle:
+        switch model.state {
+        case .idle(let message):
             VStack(spacing: 4) {
-                Text("Line up a word inside the box")
+                Text(message ?? "Line up a word inside the box")
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.82))
-                Text("Move your phone to scan continuously")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                if message == nil {
+                    Text("Tap Scan when it's in frame")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
-        case .recognized:
-            Text("\(CameraMock.recognizedWords.count) words found in frame")
+            .padding(.horizontal, 32)
+        case .scanning(let preview):
+            Text(preview ?? "Looking for text…")
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.82))
+                .lineLimit(1)
+                .padding(.horizontal, 32)
+        case .settled(let words):
+            Text("\(words.count) words found in frame")
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.6))
         }
@@ -117,7 +153,7 @@ struct CameraView: View {
                 Circle()
                     .fill(Color(hex: 0x7FD98F))
                     .frame(width: 7, height: 7)
-                Text("Scanning · Offline")
+                Text(statusLabel)
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.9))
             }
@@ -142,32 +178,34 @@ struct CameraView: View {
         .padding(.horizontal, 20)
     }
 
-    /// TODO: Replace with an AVFoundation `AVCaptureSession` preview layer (Week 0 PoC).
-    /// The blur mechanism (material fill with a hole cut out) is production-shaped —
-    /// only this background layer is a stand-in.
-    private var scannedBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: 0xD8CFBC), Color(hex: 0xC9BFA9), Color(hex: 0xA9A08C)],
-                startPoint: .top, endPoint: .bottom
-            )
-            VStack(alignment: .leading, spacing: 13) {
-                ForEach(0..<10, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(hex: 0x1E1A14).opacity(0.62))
-                        .frame(height: 9)
-                        .padding(.trailing, CGFloat((index % 4) * 24))
-                }
-            }
-            .padding(.horizontal, 26)
-            .padding(.top, 130)
+    private var statusLabel: String {
+        if case .scanning = model.state { return "Scanning · Offline" }
+        return "Ready · Offline"
+    }
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        switch model.state {
+        case .idle:
+            scanButton(title: "Scan", action: model.tapScan)
+        case .scanning:
+            scanButton(title: "Cancel", action: model.tapCancel)
+        case .settled:
+            EmptyView()
         }
     }
 
-    private func simulateRecognition() {
-        guard scanState == .idle else { return }
-        scanState = .recognized
-        sheetStage = .wordList
+    private func scanButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.accentColor, in: Capsule())
+        }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 24)
     }
 }
 
