@@ -37,14 +37,24 @@ struct CameraView: View {
                 height: guideBoxHeight
             )
 
+            // `guideRect` 는 안전 영역 안쪽 좌표다. 카메라 프리뷰와 블러 마스크는
+            // `.ignoresSafeArea()` 로 화면 전체에 깔리므로 원점이 안전 영역 인셋만큼
+            // 어긋나 있다. 그 두 레이어에는 화면 전체 좌표로 옮긴 사각형을 넘긴다.
+            // 이걸 빠뜨리면 인식 영역이 브래킷보다 상단 인셋만큼 위에 잡혀서, 사용자가
+            // 브래킷 안에 맞춘 단어가 아니라 그 위의 띠를 읽는다.
+            let fullScreenGuideRect = guideRect.offsetBy(
+                dx: geo.safeAreaInsets.leading,
+                dy: geo.safeAreaInsets.top
+            )
+
             ZStack {
                 ScannerViewRepresentable(
                     recognizer: recognizer,
-                    regionOfInterest: guideRect
+                    regionOfInterest: fullScreenGuideRect
                 )
                 .ignoresSafeArea()
 
-                GuideMaskShape(holeRect: guideRect, cornerRadius: guideBoxCornerRadius)
+                GuideMaskShape(holeRect: fullScreenGuideRect, cornerRadius: guideBoxCornerRadius)
                     .fill(.ultraThinMaterial, style: FillStyle(eoFill: true))
                     .ignoresSafeArea()
 
