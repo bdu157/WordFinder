@@ -1050,6 +1050,11 @@ git commit -m "feat: add VisionKit DataScanner implementation of TextRecognizer"
 > 반대다. 어떤 카메라 구현이든 자기 프리뷰 뷰를 가져오므로 이음매를 완전히 없앨 수는
 > 없다. 최소한 지킬 것: `ScanViewModel` 은 카메라 타입을 전혀 몰라야 하고, 교체 시
 > 고쳐야 할 지점이 이 파일 안 한 곳으로 국한돼야 한다.
+>
+> **결정 (2026-09-21): A — `CameraView` 한 곳에 격리한다.** 백엔드 선택 파일을 따로
+> 두는 안(B)은 교체 시 약 3줄을 아끼는 대가로 추상화를 하나 더 들이는 것이라 보류했다.
+> 교체가 실제로 일어날지는 Task 7의 인식률 결과에 달렸고, 그때 B로 올려도 늦지 않다.
+> 코드에는 교체 지점임을 주석으로 표시한다.
 
 **`ScanViewModel.swift` 는 수정하지 않는다.** Task 4에서 `recognizer` 를 `TextRecognizer` 프로토콜 타입으로 private 하게 잡아둔 그대로 둔다. 화면이 프리뷰를 얹으려면 구체 타입이 필요한데, 그 인스턴스는 **`CameraView` 가 직접 소유**한다. 그래서 `ScanViewModel` 은 카메라 구현을 계속 모른 채로 남고, Task 4의 테스트 12개가 수정 없이 통과한다.
 
@@ -1066,10 +1071,14 @@ import SwiftUI
 struct CameraView: View {
     /// 프리뷰를 얹으려면 구체 타입이 필요하므로 화면이 소유한다.
     /// `ScanViewModel` 은 프로토콜 너머로만 이걸 본다.
+    ///
+    /// **카메라 구현 교체 지점.** `AVCaptureSession` + Vision 구현으로 바꿀 때는 이 타입,
+    /// 아래 `init()` 의 생성, `body` 의 프리뷰 뷰 — 이 파일의 세 곳만 고친다.
     @State private var recognizer: DataScannerRecognizer
     @State private var model: ScanViewModel
     @State private var showsSheet = false
     @State private var detailWord: ScannedWord?
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let recognizer = DataScannerRecognizer()
@@ -1136,6 +1145,14 @@ struct CameraView: View {
                     try? await Task.sleep(for: .milliseconds(250))
                     model.tick()
                 }
+            }
+            // 화면을 벗어나거나(다른 탭) 앱이 백그라운드로 가면 스캔을 멈춘다. 안 그러면
+            // 히스토리 탭을 보는 동안에도 카메라가 켜져 있다. `tapCancel()` 은 스캔 중이
+            // 아닐 때는 아무것도 하지 않으므로 어느 상태에서 불러도 안전하다.
+            // `.inactive` (제어 센터를 내리는 등 일시적 상태)에서는 멈추지 않는다.
+            .onDisappear { model.tapCancel() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { model.tapCancel() }
             }
         }
     }
@@ -1308,7 +1325,18 @@ xcodegen generate
 
 Xcode에서 프로젝트를 열고 기기를 선택해 실행한다. 무선으로 하려면 케이블로 한 번 연결한 뒤 Xcode → Window → Devices and Simulators → 기기 선택 → **Connect via network** 를 켜면 이후 케이블 없이 된다.
 
-- [ ] **Step 2: 권한 흐름 확인**
+- [ ] **Step 2: Scan 전에 카메라 화면이 보이는지 확인 (최우선)**
+
+스펙 §4는 `idle`(Scan 누르기 전)에도 카메라 영상이 보여서 미리 조준할 수 있다고 전제한다.
+그런데 `DataScannerViewController` 가 `startScanning()` 전에도 영상을 보여주는지는
+시뮬레이터로 확인할 수 없었다. 앱을 켜고 **Scan을 누르지 않은 상태**에서 화면을 본다.
+
+- 영상이 보인다 → 전제 성립, 다음 단계로
+- 검은 화면이다 → 조준 후 누르는 흐름이 깨진다. 화면이 뜰 때 `startScanning()` 을 호출해
+  카메라를 켜두고, Scan을 누르기 전의 인식 결과는 `ScanViewModel` 에서 버리도록 바꿔야
+  한다. 별도 태스크로 설계부터 다시 잡는다.
+
+- [ ] **Step 3: 권한 흐름 확인**
 
 앱을 처음 설치하고 실행한다. 기대 동작:
 - 앱 실행 시점에는 권한 요청이 뜨지 **않는다**
@@ -1317,7 +1345,7 @@ Xcode에서 프로젝트를 열고 기기를 선택해 실행한다. 무선으�
 
 거부 상태를 다시 만들려면 설정 → WordFinder → 카메라를 끄거나, 앱을 삭제하고 재설치한다.
 
-- [ ] **Step 3: 실제 인식률 측정**
+- [ ] **Step 4: 실제 인식률 측정**
 
 원서 3권 × 조명 3조건(밝은 실내 / 어두운 실내 / 야외)으로 각각 5회 스캔한다. 기록할 것:
 - 확정까지 걸린 체감 시간
@@ -1326,9 +1354,9 @@ Xcode에서 프로젝트를 열고 기기를 선택해 실행한다. 무선으�
 
 PLAN.md §10의 0주차 PoC 첫 과제가 이것이다.
 
-- [ ] **Step 4: 상수 튜닝**
+- [ ] **Step 5: 상수 튜닝**
 
-Step 3 결과로 `StabilityDetector` 의 기본값을 조정한다.
+Step 4 결과로 상수를 조정한다. 최소 길이는 `WordTokenizer.minimumLength` 를 바꿔야 한다 — `StabilityDetector` 쪽은 앱 경로에서 도달하지 않는다.
 - 확정이 너무 빨라 잘못 읽은 값이 확정되면 → `stabilityWindow` 를 0.8~1.0으로 올린다
 - 확정이 안 돼 답답하면 → 0.4로 내린다
 - 10초가 너무 길게 느껴지면 → `timeout` 을 7초로 내린다
@@ -1341,7 +1369,7 @@ xcodebuild test -project WordFinder.xcodeproj -scheme WordFinder -destination 'p
 
 Expected: `** TEST SUCCEEDED **`
 
-- [ ] **Step 5: 스캔 버튼 존폐 판단과 스펙 갱신**
+- [ ] **Step 6: 스캔 버튼 존폐 판단과 스펙 갱신**
 
 설계 문서 §8에 적힌 대로, 스캔 버튼은 PLAN.md §2 v4의 연속 스캔 UX와 어긋난다. 실기기에서 써본 뒤 결정한다.
 - **유지** → PLAN.md §2·§7과 디자인 목업을 갱신해야 한다는 항목을 스펙 §8에 남긴다
@@ -1349,7 +1377,7 @@ Expected: `** TEST SUCCEEDED **`
 
 스펙 문서 §8 끝에 실기기 검증 결과와 결정을 덧붙인다.
 
-- [ ] **Step 6: 커밋**
+- [ ] **Step 7: 커밋**
 
 ```bash
 git add WordFinder/Features/Camera/Scanning/StabilityDetector.swift docs/superpowers/specs/2026-08-19-camera-ocr-design.md
