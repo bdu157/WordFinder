@@ -111,7 +111,9 @@ struct CameraView: View {
     @ViewBuilder
     private var sheetContent: some View {
         if let detailWord {
-            WordDetailSheet(detail: CameraMock.detail)
+            // 다른 단어를 누르면 새 조회가 돌도록 단어를 식별자로 둔다.
+            WordLookupView(term: detailWord.term)
+                .id(detailWord.term)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .onDisappear { self.detailWord = nil }
