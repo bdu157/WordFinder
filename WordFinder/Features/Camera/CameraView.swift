@@ -26,6 +26,11 @@ struct CameraView: View {
     /// 가이드 박스의 세로 중심 (화면 높이 비율). 목업 기준이며, 시트가 `.medium`
     /// 으로 올라와도 가리지 않도록 정중앙을 피해 두었다.
     private let guideBoxCenterY: CGFloat = 0.239
+    /// 가이드 박스 바깥 블러 레이어의 불투명도. `.ultraThinMaterial` 이 이미 가장 얇은
+    /// 시스템 재질이라, 더 비치게 하려면 레이어 자체를 옅게 하는 수밖에 없다.
+    /// 1이면 주변이 뿌옇게 가려져서 찾을 단어를 박스로 가져오기 어렵다는 실기기 피드백이
+    /// 있었다. 낮출수록 주변이 또렷해지는 대신 박스가 덜 도드라진다.
+    private let outsideBlurOpacity: Double = 0.7
 
     var body: some View {
         GeometryReader { geo in
@@ -56,6 +61,7 @@ struct CameraView: View {
 
                 GuideMaskShape(holeRect: fullScreenGuideRect, cornerRadius: guideBoxCornerRadius)
                     .fill(.ultraThinMaterial, style: FillStyle(eoFill: true))
+                    .opacity(outsideBlurOpacity)
                     .ignoresSafeArea()
 
                 CornerBracketsShape()
@@ -105,7 +111,9 @@ struct CameraView: View {
     @ViewBuilder
     private var sheetContent: some View {
         if let detailWord {
-            WordDetailSheet(detail: CameraMock.detail)
+            // 다른 단어를 누르면 새 조회가 돌도록 단어를 식별자로 둔다.
+            WordLookupView(term: detailWord.term)
+                .id(detailWord.term)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .onDisappear { self.detailWord = nil }
