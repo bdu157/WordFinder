@@ -31,7 +31,9 @@ final class StabilityDetector {
     private var candidate: String?
     private var candidateSince: TimeInterval?
 
-    init(stabilityWindow: TimeInterval = 0.6, timeout: TimeInterval = 10, minimumLength: Int = 2) {
+    /// 기본값은 실기기 테스트로 정했다 — 0.6초는 체감상 적당했고, 10초였던 타임아웃은
+    /// 안내가 뜨기까지 너무 오래 기다린다는 피드백으로 7초로 줄였다 (2026-09-21).
+    init(stabilityWindow: TimeInterval = 0.6, timeout: TimeInterval = 7, minimumLength: Int = 2) {
         self.stabilityWindow = stabilityWindow
         self.timeout = timeout
         self.minimumLength = minimumLength
