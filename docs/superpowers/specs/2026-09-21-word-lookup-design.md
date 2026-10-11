@@ -197,6 +197,16 @@ dictionaryapi.dev에서 동의어는 대부분 **품사 단위**로 온다. `res
 
 - 여러 항목에 걸친 발음기호·음성 우선순위 테스트 — 실제 픽스처는 항목이 하나뿐이라 검증되지 않았다. 기존 합성 JSON(`bank`)에 phonetics를 넣어 추가한다. 2단계가 `audioUrl` 을 처음 읽는 코드다.
 
+> **2단계 완료 후 정정 (2026-10-11)** — 마지막 문장은 틀렸다. 2단계는 `audioUrl` 을 읽지 않는다.
+> 발음 오디오 호스트를 측정했더니 약 20초 뒤 HTTP 522 로 **가용률이 0** 이어서, 2단계는
+> TTS(`AVSpeechSynthesizer`)만 쓰기로 했다 (PLAN.md §3.1 F6 주석). `audioUrl` 은 매퍼가
+> 계속 채우지만 앱이 소비하지 않는다.
+>
+> 위 테스트 숙제 자체는 유효해서 그대로 했고, 범위를 넓혔다 —
+> `picksPhoneticAndAudioIndependentlyAcrossEntries` 가 항목 *사이* 순서를,
+> `prefersEntryLevelPhoneticAndTheFirstAudioWithinOneEntry` 가 항목 *안* 순서를 고정한다.
+> 뒤의 것은 검증에서 "변이를 넣어도 테스트가 안 잡힌다"는 지적을 받고 추가했다.
+
 **나중에 (별도 작업)**
 
 - 접근성: 닫기 버튼 터치 영역 30×30 (권장 44), `Font.wf*` 가 고정 크기라 Dynamic Type 미대응, "Show all 34" 가 어느 품사인지 VoiceOver에 알리지 않음. 디자인 토큰 수준의 문제라 이번 범위 밖이다.
