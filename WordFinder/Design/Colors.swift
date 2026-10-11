@@ -36,7 +36,7 @@ private extension UIColor {
     }
 }
 
-/// Non-adaptive hex color, for one-off decorative use (e.g. mock camera backgrounds)
+/// Non-adaptive hex color, for one-off decorative use (e.g. the status dot in `CameraView`)
 /// that isn't a semantic design token.
 extension Color {
     init(hex: UInt32) {

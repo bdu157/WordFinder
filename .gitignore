@@ -11,3 +11,12 @@ WordFinder/Config/Team.xcconfig
 
 # Per-developer Claude Code permissions/overrides — .claude/settings.json (shared) stays tracked.
 .claude/settings.local.json
+
+# Per-developer agent-harness config (gate command, risk list, deploy targets).
+# The project knowledge worth sharing lives in AGENTS.md instead, so that the two
+# can't drift apart; what stays here is specific to one developer's tooling.
+.claude/project-profile.md
+
+# 하네스 작업 중간 산출물 — git에 올리지 않는다.
+_workspace/
+_workspace_prev/
