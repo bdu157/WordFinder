@@ -14,10 +14,9 @@ struct WordDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var expandedPartsOfSpeech: Set<String> = []
-    /// 발음 재생. 화면이 소유한다. 다른 단어를 누르면 `CameraView.swift:116` 의
-    /// `.id(detailWord.term)` 이 이 시트를 통째로 다시 만들므로, 여기서 단어 변경을
-    /// 따로 신경 쓰지 않는다.
-    @State private var player = PronunciationPlayer(synthesizer: SystemSpeechSynthesizer())
+    /// 발음 재생. `WordLookupView` 가 소유하고 주입한다 — 조회 성공·실패 어느 쪽으로 가든
+    /// 같은 플레이어를 써야 하고, 멈추는 책임도 한 곳에 있어야 하기 때문이다.
+    let player: PronunciationPlayer
 
     var body: some View {
         ScrollView {
@@ -34,11 +33,6 @@ struct WordDetailSheet: View {
             }
         }
         .background(Color.wfBackground)
-        // **필수** — 시트를 닫거나 다른 단어로 넘어갈 때 말을 멈춘다. 빠뜨리면 화면이 사라진
-        // 뒤에도 소리가 이어지고, 오디오 세션이 활성인 채 남아 다른 앱 음악이 줄어든 상태로
-        // 방치된다. `AVSpeechSynthesizer` 의 델리게이트는 weak 이라, 이 뷰가 해제되고 나면
-        // 종료 콜백이 오지 않아 세션을 되돌릴 기회가 영영 없다.
-        .onDisappear { player.stop() }
     }
 
     private var header: some View {
@@ -55,7 +49,10 @@ struct WordDetailSheet: View {
                             .font(.wfIPA)
                             .foregroundStyle(Color.wfTextSecondary)
                     }
-                    pronunciationButton
+                    PronunciationButton(term: entry.term, player: player)
+                        // 44 프레임이 만든 여백을 상쇄해 발음기호 바로 옆에 붙인다.
+                        .padding(.vertical, -14)
+                        .padding(.leading, -14)
                 }
             }
             Spacer()
@@ -72,29 +69,6 @@ struct WordDetailSheet: View {
         .padding(.top, 8)
     }
 
-    /// 표제어를 소리로 읽는다. 원격 오디오가 아니라 기기 TTS 다 — dictionaryapi.dev 의
-    /// 발음 파일은 2026-10-11 측정에서 약 20초 뒤 HTTP 522 로, 가용률이 0이었다.
-    ///
-    /// 터치 영역은 44×44 다. 아이콘은 15pt 뿐이라 44 프레임이 만든 여백을 음수 패딩으로
-    /// 상쇄하는데, 그래도 탭은 44 전체에서 받는다 — 시뮬레이터에서 아이콘 중심에서 20pt
-    /// 떨어진 지점을 눌러 확인했다. 설계 문서 §13 이 닫기 버튼(30×30)을 권장치 미달로
-    /// 지적했으므로 새로 만드는 버튼에서 같은 실수를 반복하지 않는다.
-    private var pronunciationButton: some View {
-        Button {
-            player.toggle(entry.term)
-        } label: {
-            Image(systemName: player.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
-                .font(.system(size: 15))
-                .foregroundStyle(player.isSpeaking ? Color.accentColor : Color.wfTextSecondary)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        // 44 프레임이 만든 여백을 상쇄해 발음기호 바로 옆에 붙인다. 보이는 크기만
-        // 줄어들고 탭 영역은 44 그대로다.
-        .padding(.vertical, -14)
-        .padding(.leading, -14)
-        .accessibilityLabel(player.isSpeaking ? "Stop pronunciation" : "Play pronunciation")
-    }
 
     private func meaningSection(_ meaning: DictEntry.Meaning) -> some View {
         let isExpanded = expandedPartsOfSpeech.contains(meaning.partOfSpeech)
@@ -219,6 +193,6 @@ extension DictEntry {
 }
 
 #Preview {
-    WordDetailSheet(entry: .previewResilient)
+    WordDetailSheet(entry: .previewResilient, player: PronunciationPlayer(synthesizer: SystemSpeechSynthesizer()))
 }
 #endif
