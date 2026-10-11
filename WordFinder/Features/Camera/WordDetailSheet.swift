@@ -2,9 +2,10 @@ import SwiftUI
 
 /// 단어 상세 — 사전 항목 하나를 보여준다. `WordLookupView` 가 조회에 성공했을 때 뜬다.
 ///
-/// 레이아웃은 Claude Design 목업을 따른다. 가짜 데이터를 전제로 했던 부분 — 발음 버튼,
-/// Captured Context 카드, "Saved to History" 문구 — 은 설계 문서
-/// `2026-09-21-word-lookup-design.md` §5 에 따라 뺐다. 발음과 히스토리는 다음 단계에서 되살린다.
+/// 레이아웃은 Claude Design 목업을 따른다. 가짜 데이터를 전제로 했던 부분 중
+/// Captured Context 카드와 "Saved to History" 문구는 설계 문서
+/// `2026-09-21-word-lookup-design.md` §5 에 따라 아직 빠져 있다 (히스토리는 3단계).
+/// 발음 버튼은 2단계에서 되살렸다.
 struct WordDetailSheet: View {
     let entry: DictEntry
 
@@ -13,6 +14,9 @@ struct WordDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var expandedPartsOfSpeech: Set<String> = []
+    /// 발음 재생. `WordLookupView` 가 소유하고 주입한다 — 조회 성공·실패 어느 쪽으로 가든
+    /// 같은 플레이어를 써야 하고, 멈추는 책임도 한 곳에 있어야 하기 때문이다.
+    let player: PronunciationPlayer
 
     var body: some View {
         ScrollView {
@@ -37,11 +41,18 @@ struct WordDetailSheet: View {
                 Text(entry.term)
                     .font(.wfHeadwordSheet)
                     .foregroundStyle(Color.wfTextPrimary)
-                // 발음기호가 없는 단어가 실제로 있다 (resilient).
-                if let phonetic = entry.phonetic {
-                    Text(phonetic)
-                        .font(.wfIPA)
-                        .foregroundStyle(Color.wfTextSecondary)
+                HStack(spacing: 6) {
+                    // 발음기호가 없는 단어가 실제로 있다 (resilient). 그래도 TTS 는 표제어만
+                    // 있으면 읽을 수 있으므로 버튼은 발음기호와 무관하게 항상 둔다.
+                    if let phonetic = entry.phonetic {
+                        Text(phonetic)
+                            .font(.wfIPA)
+                            .foregroundStyle(Color.wfTextSecondary)
+                    }
+                    PronunciationButton(term: entry.term, player: player)
+                        // 44 프레임이 만든 여백을 상쇄해 발음기호 바로 옆에 붙인다.
+                        .padding(.vertical, -14)
+                        .padding(.leading, -14)
                 }
             }
             Spacer()
@@ -57,6 +68,7 @@ struct WordDetailSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
     }
+
 
     private func meaningSection(_ meaning: DictEntry.Meaning) -> some View {
         let isExpanded = expandedPartsOfSpeech.contains(meaning.partOfSpeech)
@@ -181,6 +193,6 @@ extension DictEntry {
 }
 
 #Preview {
-    WordDetailSheet(entry: .previewResilient)
+    WordDetailSheet(entry: .previewResilient, player: PronunciationPlayer(synthesizer: SystemSpeechSynthesizer()))
 }
 #endif
